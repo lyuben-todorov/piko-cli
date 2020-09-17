@@ -10,3 +10,6 @@ edition = "2018"
 rustyline = "6.3.0"
 linefeed = "0.6.0"
 rand = "0.7.3"
+
+[dependencies.piko]
+path = "../node"

@@ -11,20 +11,26 @@ use linefeed::command::COMMANDS;
 use linefeed::complete::{Completer, Completion};
 use linefeed::inputrc::parse_text;
 use linefeed::terminal::Terminal;
+use std::net::{TcpStream, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::str::FromStr;
 
 const HISTORY_FILE: &str = "linefeed.hst";
 
 fn main() -> io::Result<()> {
-    let interface = Arc::new(Interface::new("demo")?);
-    let mut thread_id = 0;
+    const DEFAULT_PORT: u16 = 8878;
 
-    println!("This is the linefeed demo program.");
+    let connection = TcpStream::connect(SocketAddr::from(
+        SocketAddrV4::new(Ipv4Addr::from_str("127.0.0.1").unwrap(), DEFAULT_PORT)
+    ).unwrap()).unwrap();
+
+    let interface = Arc::new(Interface::new("piko")?);
+
     println!("Enter \"help\" for a list of commands.");
     println!("Press Ctrl-D or enter \"quit\" to exit.");
-    println!("");
+    println!();
 
     interface.set_completer(Arc::new(DemoCompleter));
-    interface.set_prompt("demo> ")?;
+    interface.set_prompt("piko> ")?;
 
     if let Err(e) = interface.load_history(HISTORY_FILE) {
         if e.kind() == io::ErrorKind::NotFound {
@@ -43,79 +49,23 @@ fn main() -> io::Result<()> {
 
         match cmd {
             "help" => {
-                println!("linefeed demo commands:");
+                println!("piko-cli commands:");
                 println!();
-                for &(cmd, help) in DEMO_COMMANDS {
+                for &(cmd, help) in NODE_COMMANDS {
                     println!("  {:15} - {}", cmd, help);
                 }
                 println!();
-            }
-            "bind" => {
-                let d = parse_text("<input>", args);
-                interface.evaluate_directives(d);
-            }
-            "get" => {
-                if let Some(var) = interface.get_variable(args) {
-                    println!("{} = {}", args, var);
-                } else {
-                    println!("no variable named `{}`", args);
-                }
-            }
-            "list-bindings" => {
-                for (seq, cmd) in interface.lock_reader().bindings() {
-                    let seq = format!("\"{}\"", escape_sequence(seq));
-                    println!("{:20}: {}", seq, cmd);
-                }
             }
             "list-commands" => {
                 for cmd in COMMANDS {
                     println!("{}", cmd);
                 }
             }
-            "list-variables" => {
-                for (name, var) in interface.lock_reader().variables() {
-                    println!("{:30} = {}", name, var);
-                }
-            }
-            "spawn-log-thread" => {
-                let my_thread_id = thread_id;
-                println!("Spawning log thread #{}", my_thread_id);
-
-                let iface = interface.clone();
-
-                thread::spawn(move || {
-                    let mut rng = thread_rng();
-                    let mut i = 0usize;
-                    loop {
-                        writeln!(iface, "[#{}] Concurrent message #{}",
-                                 my_thread_id, i).unwrap();
-                        let wait_ms = rng.gen_range(1, 500);
-                        thread::sleep(Duration::from_millis(wait_ms));
-                        i += 1;
-                    }
-                });
-                thread_id += 1;
-            }
-            "history" => {
-                let w = interface.lock_writer_erase()?;
-
-                for (i, entry) in w.history().enumerate() {
-                    println!("{}: {}", i, entry);
-                }
-            }
-            "save-history" => {
-                if let Err(e) = interface.save_history(HISTORY_FILE) {
-                    eprintln!("Could not save history file {}: {}", HISTORY_FILE, e);
-                } else {
-                    println!("History saved to {}", HISTORY_FILE);
-                }
-            }
             "quit" => break,
-            "set" => {
-                let d = parse_text("<input>", &line);
-                interface.evaluate_directives(d);
+            "sub" => {
+
             }
-            _ => println!("read input: {:?}", line)
+            _ => println!("Unknown command: {:?}", line)
         }
     }
 
@@ -133,18 +83,14 @@ fn split_first_word(s: &str) -> (&str, &str) {
     }
 }
 
-static DEMO_COMMANDS: &[(&str, &str)] = &[
-    ("bind",             "Set bindings in inputrc format"),
-    ("get",              "Print the value of a variable"),
-    ("help",             "You're looking at it"),
-    ("list-bindings",    "List bound sequences"),
-    ("list-commands",    "List command names"),
-    ("list-variables",   "List variables"),
-    ("spawn-log-thread", "Spawns a thread that concurrently logs messages"),
-    ("history",          "Print history"),
-    ("save-history",     "Write history to file"),
-    ("quit",             "Quit the demo"),
-    ("set",              "Assign a value to a variable"),
+static NODE_COMMANDS: &[(&str, &str)] = &[
+    ("help", "You're looking at it"),
+    ("list-commands", "List command names"),
+    ("quit", "Quit"),
+    ("sub", "Subscribe to cluster"),
+    ("unsub", "Unsubscribe from cluster"),
+    ("pub", "Publish to cluster"),
+    ("poll", "Poll you message queue from cluster")
 ];
 
 struct DemoCompleter;
@@ -161,29 +107,13 @@ impl<Term: Terminal> Completer<Term> for DemoCompleter {
             None => {
                 let mut compls = Vec::new();
 
-                for &(cmd, _) in DEMO_COMMANDS {
+                for &(cmd, _) in NODE_COMMANDS {
                     if cmd.starts_with(word) {
                         compls.push(Completion::simple(cmd.to_owned()));
                     }
                 }
 
                 Some(compls)
-            }
-            // Complete command parameters
-            Some("get") | Some("set") => {
-                if words.count() == 0 {
-                    let mut res = Vec::new();
-
-                    for (name, _) in prompter.variables() {
-                        if name.starts_with(word) {
-                            res.push(Completion::simple(name.to_owned()));
-                        }
-                    }
-
-                    Some(res)
-                } else {
-                    None
-                }
             }
             _ => None
         }
