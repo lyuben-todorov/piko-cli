@@ -656,10 +656,13 @@ dependencies = [
 name = "piko-cli"
 version = "0.1.0"
 dependencies = [
+ "byteorder",
  "linefeed",
  "piko",
  "rand",
  "rustyline",
+ "serde 1.0.116",
+ "serde_cbor",
 ]
 
 [[package]]

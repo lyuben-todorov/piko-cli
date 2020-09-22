@@ -13,15 +13,43 @@ use linefeed::inputrc::parse_text;
 use linefeed::terminal::Terminal;
 use std::net::{TcpStream, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::str::FromStr;
+use std::io::{Write, Read};
+use piko::client::{ClientReq, ClientRes};
+use byteorder::{WriteBytesExt, ReadBytesExt};
 
 const HISTORY_FILE: &str = "linefeed.hst";
 
+pub fn write_req(stream: &mut TcpStream, client_req: ClientReq) {
+    let req = serde_cbor::to_vec(&client_req).unwrap();
+
+    let size = req.len();
+
+    stream.write_u8(size as u8).unwrap();
+    stream.write_all(req.as_slice()).unwrap();
+}
+
+
+pub fn read_res(stream: &mut TcpStream) -> ClientRes {
+    let size = stream.read_u8().unwrap();
+    let mut buf = vec![0u8; size as usize];
+    stream.read_exact(&mut buf).unwrap();
+    let res: ClientRes = serde_cbor::from_slice(buf.as_slice()).unwrap();
+    res
+}
+
+fn input(address: &SocketAddr, req: ClientReq) -> ClientRes {
+    let mut stream = TcpStream::connect(address).unwrap();
+
+    write_req(&mut stream, req);
+
+    read_res(&mut stream)
+}
+
 fn main() -> io::Result<()> {
     const DEFAULT_PORT: u16 = 8878;
+    const CLIENT_ID: u64 = 1234;
 
-    let connection = TcpStream::connect(SocketAddr::from(
-        SocketAddrV4::new(Ipv4Addr::from_str("127.0.0.1").unwrap(), DEFAULT_PORT)
-    ).unwrap()).unwrap();
+    let address = SocketAddr::from(SocketAddrV4::new(Ipv4Addr::from_str("127.0.0.1").unwrap(), DEFAULT_PORT));
 
     let interface = Arc::new(Interface::new("piko")?);
 
@@ -61,14 +89,25 @@ fn main() -> io::Result<()> {
                     println!("{}", cmd);
                 }
             }
-            "quit" => break,
-            "sub" => {
+            "pub" => {
 
             }
+            "sub" => {
+                let req = ClientReq::sub(CLIENT_ID);
+
+                let res = input(&address, req);
+                match res {
+                    ClientRes::Success { message, bytes } => {
+                        println!("{}", message);
+                    }
+                    _ => {}
+                }
+            }
+            "quit" => break,
+
             _ => println!("Unknown command: {:?}", line)
         }
     }
-
     println!("Goodbye.");
 
     Ok(())
