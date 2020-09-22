@@ -31,6 +31,7 @@ pub fn write_req(stream: &mut TcpStream, client_req: ClientReq) {
 
 pub fn read_res(stream: &mut TcpStream) -> ClientRes {
     let size = stream.read_u8().unwrap();
+
     let mut buf = vec![0u8; size as usize];
     stream.read_exact(&mut buf).unwrap();
     let res: ClientRes = serde_cbor::from_slice(buf.as_slice()).unwrap();
@@ -90,7 +91,18 @@ fn main() -> io::Result<()> {
                 }
             }
             "pub" => {
+                let req = ClientReq::publ(CLIENT_ID, args.as_bytes().to_vec());
 
+                let res = input(&address, req);
+
+                match res {
+                    ClientRes::Success { message, bytes } => {
+                        println!("{}", message);
+                    }
+                    ClientRes::Error { message } => {
+                        println!("Error: {}", message);
+                    }
+                }
             }
             "sub" => {
                 let req = ClientReq::sub(CLIENT_ID);
@@ -100,14 +112,32 @@ fn main() -> io::Result<()> {
                     ClientRes::Success { message, bytes } => {
                         println!("{}", message);
                     }
-                    _ => {}
+                    ClientRes::Error { message } => {
+                        println!("Error: {}", message);
+                    }
+                }
+            }
+            "unsub" => {
+                let req = ClientReq::unsub(CLIENT_ID);
+
+                let res = input(&address, req);
+                match res {
+                    ClientRes::Success { message, bytes } => {
+                        println!("{}", message);
+                    }
+                    ClientRes::Error { message } => {
+                        println!("Error: {}", message);
+                    }
                 }
             }
             "quit" => break,
-
+            "" => {}
             _ => println!("Unknown command: {:?}", line)
         }
     }
+
+
+    input(&address, ClientReq::unsub(CLIENT_ID));
     println!("Goodbye.");
 
     Ok(())
