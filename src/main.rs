@@ -1,3 +1,5 @@
+extern crate clap;
+
 use std::io;
 use std::sync::Arc;
 use std::thread;
@@ -11,11 +13,13 @@ use linefeed::command::COMMANDS;
 use linefeed::complete::{Completer, Completion};
 use linefeed::inputrc::parse_text;
 use linefeed::terminal::Terminal;
-use std::net::{TcpStream, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{TcpStream, Ipv4Addr, SocketAddr, SocketAddrV4, IpAddr};
 use std::str::FromStr;
 use std::io::{Write, Read};
 use piko::client::{ClientReq, ClientRes};
 use byteorder::{WriteBytesExt, ReadBytesExt};
+use clap::{App, Arg};
+use pnet::datalink;
 
 const HISTORY_FILE: &str = "linefeed.hst";
 
@@ -47,10 +51,34 @@ fn input(address: &SocketAddr, req: ClientReq) -> ClientRes {
 }
 
 fn main() -> io::Result<()> {
-    const DEFAULT_PORT: u16 = 8878;
+    let matches = App::new("Piko CLI")
+        .version("1.0")
+        .author("Lyuben Todorov <lyuben.todorov@gmail.com>")
+        .about("CLI for Piko")
+        .arg(Arg::new("port")
+            .short('p')
+            .long("port")
+            .value_name("PORT")
+            .about("Specify port for client connection. Default 7878")
+            .takes_value(true))
+        .arg(Arg::new("address")
+            .short('a')
+            .long("address")
+            .takes_value(true))
+        .get_matches();
+
+    let ip = IpAddr::from_str("192.168.9.101").unwrap();
+    println!("{}", ip.to_string());
+
+    let port: u16 = matches.value_of("port").unwrap_or("8878").parse().unwrap();
+    
+    let ip = match matches.value_of("address") {
+        Some(addr) => IpAddr::from_str(addr).expect("Can't parse ip address"),
+        None => ip
+    };
     const CLIENT_ID: u64 = 1234;
 
-    let address = SocketAddr::from(SocketAddrV4::new(Ipv4Addr::from_str("127.0.0.1").unwrap(), DEFAULT_PORT));
+    let address = SocketAddr::from(SocketAddrV4::new(Ipv4Addr::from_str(ip.to_string().as_str()).unwrap(), port));
 
     let interface = Arc::new(Interface::new("piko")?);
 
