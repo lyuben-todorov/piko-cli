@@ -59,23 +59,23 @@ fn main() -> io::Result<()> {
             .short('p')
             .long("port")
             .value_name("PORT")
-            .about("Specify port for client connection. Default 7878")
+            .default_value("8878")
+            .about("Specify port for client connection. Default 8878")
             .takes_value(true))
         .arg(Arg::new("address")
             .short('a')
             .long("address")
+            .value_name("ADDRESS")
+            .default_value("0.0.0.0")
+            .about("Specify address for client connection. Default is localhost")
             .takes_value(true))
         .get_matches();
 
-    let ip = IpAddr::from_str("192.168.9.101").unwrap();
-    println!("{}", ip.to_string());
 
-    let port: u16 = matches.value_of("port").unwrap_or("8878").parse().unwrap();
-    
-    let ip = match matches.value_of("address") {
-        Some(addr) => IpAddr::from_str(addr).expect("Can't parse ip address"),
-        None => ip
-    };
+    let port: u16 = matches.value_of("port").unwrap().parse().unwrap();
+
+    let ip = IpAddr::from_str(matches.value_of("address").unwrap()).expect("Can't parse ip address");
+
     const CLIENT_ID: u64 = 1234;
 
     let address = SocketAddr::from(SocketAddrV4::new(Ipv4Addr::from_str(ip.to_string().as_str()).unwrap(), port));
