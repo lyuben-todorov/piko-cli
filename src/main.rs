@@ -119,16 +119,18 @@ fn main() -> io::Result<()> {
                 }
             }
             "pub" => {
-                let req = ClientReq::publ(CLIENT_ID, args.as_bytes().to_vec());
+                if args.len() > 0 {
+                    let req = ClientReq::publ(CLIENT_ID, args.as_bytes().to_vec());
 
-                let res = input(&address, req);
+                    let res = input(&address, req);
 
-                match res {
-                    ClientRes::Success { message, bytes } => {
-                        println!("{}", message);
-                    }
-                    ClientRes::Error { message } => {
-                        println!("Error: {}", message);
+                    match res {
+                        ClientRes::Success { message, bytes } => {
+                            println!("{}", message);
+                        }
+                        ClientRes::Error { message } => {
+                            println!("Error: {}", message);
+                        }
                     }
                 }
             }
@@ -152,6 +154,20 @@ fn main() -> io::Result<()> {
                 match res {
                     ClientRes::Success { message, bytes } => {
                         println!("{}", message);
+                    }
+                    ClientRes::Error { message } => {
+                        println!("Error: {}", message);
+                    }
+                }
+            }
+            "poll" => {
+                let req = ClientReq::poll(CLIENT_ID);
+
+                let res = input(&address, req);
+                match res {
+                    ClientRes::Success { message, bytes } => {
+                        println!("{}", message);
+                        println!("{}", String::from_utf8(bytes).unwrap());
                     }
                     ClientRes::Error { message } => {
                         println!("Error: {}", message);
